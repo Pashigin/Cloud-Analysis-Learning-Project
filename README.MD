@@ -53,3 +53,7 @@ For the first time, I chose [Klipfolio](https://www.klipfolio.com/) service. How
 With this training project I can understand how to model a database, how to export it to the cloud and analyse it. 
 
 It is not essential for a beginner data analyst, however it gives a good understanding of how everything works. 
+
+# UPDATED
+
+Created tables with managers and returns. Added two more columns and inserted data to sales_fact.

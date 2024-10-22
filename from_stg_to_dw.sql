@@ -3,16 +3,20 @@
 -- fix data quality problem
 -- create sales_fact table
 -- match number of rows between staging and dw (business layer);CREATE SCHEMA dw;
+-- create 2 more tables and update the fact table
 --SHIPPING;
 --creating a table
 DROP TABLE IF EXISTS dw.shipping_dim;
+
 CREATE TABLE dw.shipping_dim (
     ship_id serial NOT NULL,
     shipping_mode varchar(14) NOT NULL,
     CONSTRAINT PK_shipping_dim PRIMARY KEY (ship_id)
 );
+
 --deleting rows
 TRUNCATE TABLE dw.shipping_dim;
+
 --generating ship_id and inserting ship_mode from orders
 INSERT INTO
     dw.shipping_dim
@@ -26,21 +30,27 @@ FROM
         FROM
             stg.orders
     ) a;
+
 --checking
 SELECT
     *
 FROM
     dw.shipping_dim sd;
---CUSTOMER;DROP TABLE IF EXISTS dw.customer_dim ;;CREATE TABLE dw.customer_dim
-(
+
+--CUSTOMER
+DROP TABLE IF EXISTS dw.customer_dim;
+
+CREATE TABLE dw.customer_dim (
     cust_id serial NOT NULL,
     customer_id varchar(8) NOT NULL,
     --id can't be NULL
     customer_name varchar(22) NOT NULL,
     CONSTRAINT PK_customer_dim PRIMARY KEY (cust_id)
 );
+
 --deleting rows
 TRUNCATE TABLE dw.customer_dim;
+
 --inserting
 INSERT INTO
     dw.customer_dim
@@ -56,11 +66,13 @@ FROM
         FROM
             stg.orders
     ) a;
+
 --checking
 SELECT
     *
 FROM
     dw.customer_dim cd;
+
 --GEOGRAPHY;DROP TABLE IF EXISTS dw.geo_dim ;;CREATE TABLE dw.geo_dim
 (
     geo_id serial NOT NULL,
@@ -71,8 +83,10 @@ FROM
     --can't be integer, we lost first 0
     CONSTRAINT PK_geo_dim PRIMARY KEY (geo_id)
 );
+
 --deleting rows
 TRUNCATE TABLE dw.geo_dim;
+
 --generating geo_id and inserting rows from orders
 INSERT INTO
     dw.geo_dim
@@ -92,6 +106,7 @@ FROM
         FROM
             stg.orders
     ) a;
+
 --data quality check
 SELECT
     DISTINCT country,
@@ -104,6 +119,7 @@ WHERE
     country IS NULL
     OR city IS NULL
     OR postal_code IS NULL;
+
 -- City Burlington, Vermont doesn't have postal code
 UPDATE
     dw.geo_dim
@@ -112,6 +128,7 @@ SET
 WHERE
     city = 'Burlington'
     AND postal_code IS NULL;
+
 --also update source file
 UPDATE
     stg.orders
@@ -120,15 +137,18 @@ SET
 WHERE
     city = 'Burlington'
     AND postal_code IS NULL;
+
 SELECT
     *
 FROM
     dw.geo_dim
 WHERE
     city = 'Burlington';
+
 --PRODUCT;
 --creating a table
 DROP TABLE IF EXISTS dw.product_dim;
+
 CREATE TABLE dw.product_dim (
     prod_id serial NOT NULL,
     --we created surrogated key
@@ -140,8 +160,10 @@ CREATE TABLE dw.product_dim (
     segment varchar(11) NOT NULL,
     CONSTRAINT PK_product_dim PRIMARY KEY (prod_id)
 );
+
 --deleting rows
 TRUNCATE TABLE dw.product_dim;
+
 --
 INSERT INTO
     dw.product_dim
@@ -163,15 +185,16 @@ FROM
         FROM
             stg.orders
     ) a;
+
 --checking
 SELECT
     *
 FROM
     dw.product_dim cd;
---CALENDAR use function instead 
--- examplehttps://tapoueh.org/blog/2017/06/postgresql-and-the-calendar/;
---creating a table
+
+--CALENDAR
 DROP TABLE IF EXISTS dw.calendar_dim;
+
 CREATE TABLE dw.calendar_dim (
     dateid serial NOT NULL,
     YEAR int NOT NULL,
@@ -183,68 +206,59 @@ CREATE TABLE dw.calendar_dim (
     leap varchar(20) NOT NULL,
     CONSTRAINT PK_calendar_dim PRIMARY KEY (dateid)
 );
+
 --deleting rows
 TRUNCATE TABLE dw.calendar_dim;
---
+
+--custom calendaer code
 INSERT INTO
-    dw.calendar_dim (
-        date_id,
-        year,
-        quarter,
-        MONTH,
-        week,
-        date,
-        week_day,
-        leap
-    )
+    dw.calendar_dim
 SELECT
     to_char(date, 'yyyymmdd') :: int AS date_id,
-    extract(
+    EXTRACT(
         'year'
         FROM
             date
-    ) :: int AS year,
-    extract(
+    ) :: int AS YEAR,
+    EXTRACT(
         'quarter'
         FROM
             date
     ) :: int AS quarter,
-    extract(
+    EXTRACT(
         'month'
         FROM
             date
     ) :: int AS MONTH,
-    extract(
+    EXTRACT(
         'week'
         FROM
             date
     ) :: int AS week,
     date :: date,
     to_char(date, 'dy') AS week_day,
-    (
-        CASE
-            WHEN extract(
-                'day'
-                FROM
-                    (date + INTERVAL '2 months')
-            ) = 29 THEN TRUE
-            ELSE false
-        END
-    ) AS leap
+    EXTRACT(
+        'day'
+        FROM
+            (date + INTERVAL '2 month - 1 day')
+    ) = 29 AS leap
 FROM
     generate_series(
-        timestamp '2000-01-01',
-        timestamp '2030-01-01',
+        date '2000-01-01',
+        date '2030-01-01',
         INTERVAL '1 day'
     ) AS t(date);
+
 --checking
 SELECT
     *
 FROM
     dw.calendar_dim;
+
 --METRICS;
 --creating a table
 DROP TABLE IF EXISTS dw.sales_fact;
+
 CREATE TABLE dw.sales_fact (
     sales_id serial NOT NULL,
     cust_id integer NOT NULL,
@@ -260,6 +274,7 @@ CREATE TABLE dw.sales_fact (
     discount NUMERIC(4, 2) NOT NULL,
     CONSTRAINT PK_sales_fact PRIMARY KEY (sales_id)
 );
+
 INSERT INTO
     dw.sales_fact
 SELECT
@@ -289,7 +304,8 @@ FROM
     AND o.product_id = p.product_id
     INNER JOIN dw.customer_dim cd ON cd.customer_id = o.customer_id
     AND cd.customer_name = o.customer_name;
---get 9994rows
+
+--check for all rows from stg.orders
 SELECT
     count(*)
 FROM
@@ -298,7 +314,101 @@ FROM
     INNER JOIN dw.geo_dim g ON sf.geo_id = g.geo_id
     INNER JOIN dw.product_dim p ON sf.prod_id = p.prod_id
     INNER JOIN dw.customer_dim cd ON sf.cust_id = cd.cust_id;
+
+--RETURNS
+DROP TABLE IF EXISTS dw.returns_dim;
+
+CREATE TABLE dw.returns_dim (
+    return_id serial NOT NULL,
+    returned varchar(10) NOT NULL,
+    order_id varchar(20) NOT NULL,
+    CONSTRAINT PK_returns_dim PRIMARY KEY (return_id)
+);
+
+--Add a column with returns
+ALTER TABLE
+    dw.sales_fact
+ADD
+    COLUMN return_id integer;
+
+ALTER TABLE
+    dw.sales_fact
+ADD
+    CONSTRAINT fk_sales_fact_returns_dim_return_id FOREIGN KEY (return_id) REFERENCES dw.returns_dim (return_id);
+
+--Update rows
+--the rows in dw.returns insterted in anotther script
+UPDATE
+    dw.sales_fact sf
+SET
+    return_id = r.return_id
+FROM
+    dw.returns_dim r
+WHERE
+    sf.order_id = r.order_id;
+
+--Check
 SELECT
     *
 FROM
-    dw.sales_fact sf;
+    dw.sales_fact sf
+LIMIT
+    10;
+
+--MANAGERS
+--create table with managers
+DROP TABLE IF EXISTS dw.managers_dim;
+
+CREATE TABLE managers_dim(
+    manager_id serial NOT NULL PRIMARY KEY,
+    manager VARCHAR(17) NOT NULL,
+    region VARCHAR(7) NOT NULL
+);
+
+--insert rows into dw.managers_dim
+INSERT INTO
+    managers_dim(manager, region)
+VALUES
+    ('Anna Andreadi', 'West'),
+    ('Chuck Magee', 'East'),
+    ('Kelly Williams', 'Central'),
+    ('Cassandra Brandow', 'South');
+
+--Add a column with manager_id into sales_fact
+ALTER TABLE
+    dw.sales_fact
+ADD
+    COLUMN manager_id integer;
+
+ALTER TABLE
+    dw.sales_fact
+ADD
+    CONSTRAINT fk_sales_fact_managers FOREIGN KEY (manager_id) REFERENCES dw.managers_dim (manager_id);
+
+--Insert rows from manager_dim based on rows in stg.orders
+UPDATE
+    dw.sales_fact sf
+SET
+    manager_id = m.manager_id
+FROM
+    stg.orders o
+    JOIN managers_dim m ON o.Region = m.region
+WHERE
+    sf.order_id = o.Order_ID;
+
+--Check
+SELECT
+    sf.sales_id,
+    sf.order_id,
+    m.manager_id,
+    m.manager AS manager_name,
+    m.region,
+    o.region
+FROM
+    dw.sales_fact sf
+    LEFT JOIN dw.managers_dim m ON sf.manager_id = m.manager_id
+    LEFT JOIN stg.orders o ON sf.order_id = o.order_id
+ORDER BY
+    sf.sales_id
+LIMIT
+    20;
