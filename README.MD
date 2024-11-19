@@ -4,6 +4,7 @@ The purpose of this learning project is to understand how to work with data mode
 
 The materials and steps to build the project are taken from [Data Learn](https://github.com/Data-Learn/data-engineering)
 
+
 ## Creating Data Model
 
 There are 3 possible types for creating a data model for Supestore (which you can find in the Excel project repository): 
@@ -57,3 +58,16 @@ It is not essential for a beginner data analyst, however it gives a good underst
 # UPDATED
 
 Created tables with managers and returns. Added two more columns and inserted data to sales_fact.
+
+Created dashboard in Tableau. 
+
+## Tableau Dashboard
+
+To better understand how to work with [Tableau](https://www.tableau.com), I used the free trial desktop version to import data from CockroachDB and run analysis like Klipfolio. 
+
+I can say that Tableau is much better than Klipfolio in all aspects except the price.
+
+You can find the dashboard in [tableau public](https://public.tableau.com/views/Superstore_17301309628110/Dashboard?:language=en-US&:sid=&:redirect=auth&:display_count=n&:origin=viz_share_link)
+
+
+![Tableau Dashboard](Tableau.png)
